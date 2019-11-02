@@ -1,0 +1,8 @@
+{
+  "editor.formatOnSave": true,
+  "mochaExplorer.env": { "NODE_ENV": "test" },
+  "mochaExplorer.envPath": ".env.development",
+  "mochaExplorer.files": "src/**/*.test.js",
+  "mochaExplorer.exit": true,
+  "mochaExplorer.require": "@babel/register"
+}
