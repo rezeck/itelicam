@@ -1,6 +1,6 @@
 # InteliCam
 
-<img style="float: left; margin:0 10px 10px 0" src="imgs/intelicam.png" width="60">
+<img style="float: left; margin:0 10px 10px 0" src="imgs/intelicam.png" width="600">
 
 ## Dependecies
 * python3
