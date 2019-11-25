@@ -1,4 +1,6 @@
 # internal imports
+#!/usr/bin/env python3.5
+import tornado
 from tornado.gen import coroutine
 from tornado.web import Application, RequestHandler
 from tornado.ioloop import IOLoop
@@ -7,6 +9,7 @@ from queue import Queue
 # local imports
 from vprocess import DetectionVideoStream
 
+global QUEUE
 QUEUE = Queue(maxsize=5)
 
 detector = DetectionVideoStream()
@@ -15,6 +18,7 @@ detector.start()
 class VideoStream(RequestHandler):
     @coroutine
     def get(self):
+        global QUEUE
         ioloop = tornado.ioloop.IOLoop.current()
 
         self.set_header('Cache-Control', 'no-store, no-cache, must-revalidate, pre-check=0, post-check=0, max-age=0')

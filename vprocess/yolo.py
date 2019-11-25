@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import time
 import darknet
+from vprocess import darknet
 import sys
 from ctypes import *
 import math
@@ -222,8 +223,8 @@ class YOLO_NN:
     def detect_yolo(self, frame_read):
         prev_time = time.time()
         frame_resized = cv2.resize(frame_read,
-                                   (darknet.network_width(rn.netMain),
-                                    darknet.network_height(rn.netMain)),
+                                   (darknet.network_width(self.netMain),
+                                    darknet.network_height(self.netMain)),
                                    interpolation=cv2.INTER_LINEAR)
         frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
         darknet.copy_image_from_bytes(self.darknet_image, frame_rgb.tobytes())

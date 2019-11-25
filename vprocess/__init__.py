@@ -43,7 +43,7 @@ class WebcamVideoStream:
 class DetectionVideoStream(WebcamVideoStream):
     def __init__(self):
         super().__init__()
-        self.yolo_nn = yolo.YOLO_NN('vprocess/yolov3')
+        self.yolo_nn = yolo.YOLO_NN('vprocess')
     
     def update(self):
         global N_PERSONS,QUEUE
