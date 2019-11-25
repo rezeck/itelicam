@@ -55,18 +55,6 @@ class DetectionVideoStream(WebcamVideoStream):
 
             # otherwise, read the next frame from the stream
             (self.grabbed, self.frame) = self.stream.read()
-            boxes, confidences, classIds = self.yolo_nn.detect(self.frame)
+            status, states, draw_frame = self.yolo_nn.detect(self.frame)
 
-            # go through the detections remaining
-            # after nms and draw bounding box
-            N_PERSONS = 0
-            for (box,classId) in zip(boxes,classIds):
-                if(classId==0):
-                    x = box[0]
-                    y = box[1]
-                    w = box[2]
-                    h = box[3]
-
-                    self.yolo_nn.draw_bounding_box(self.frame, 0, 100, round(x), round(y), round(x+w), round(y+h))
-            print('Inserting on queue')
             QUEUE.put(self.frame)
