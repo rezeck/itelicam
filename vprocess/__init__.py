@@ -54,7 +54,7 @@ class DetectionVideoStream(WebcamVideoStream):
                 return
 
             # otherwise, read the next frame from the stream
-            (self.grabbed, self.frame) = self.stream.read()
-            status, states, draw_frame = self.yolo_nn.detect(self.frame)
+            (self.grabbed, self.raw_frame) = self.stream.read()
+            status, states, self.frame = self.yolo_nn.detect(self.raw_frame)
 
             QUEUE.put(self.frame)
