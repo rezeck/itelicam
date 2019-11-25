@@ -1,4 +1,5 @@
 from . import yolo
+from threading import Thread
 import cv2
 
 DEFAULT_WIDTH = 640
@@ -42,7 +43,7 @@ class WebcamVideoStream:
 class DetectionVideoStream(WebcamVideoStream):
     def __init__(self):
         super().__init__()
-        self.yolo_nn = yolo.YOLO_NN('yolov3')
+        self.yolo_nn = yolo.YOLO_NN('vprocess/yolov3')
     
     def update(self):
         global N_PERSONS,QUEUE
@@ -66,6 +67,6 @@ class DetectionVideoStream(WebcamVideoStream):
                     w = box[2]
                     h = box[3]
 
-                    DETECTOR_DNN.draw_bounding_box(self.frame, 0, 100, round(x), round(y), round(x+w), round(y+h))
+                    self.yolo_nn.draw_bounding_box(self.frame, 0, 100, round(x), round(y), round(x+w), round(y+h))
             print('Inserting on queue')
             QUEUE.put(self.frame)

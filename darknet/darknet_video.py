@@ -45,6 +45,7 @@ def YOLO():
     configPath = "./cfg/yolov3-tiny.cfg"
     weightPath = "./yolov3-tiny.weights"
     metaPath = "./cfg/coco.data"
+    
     if not os.path.exists(configPath):
         raise ValueError("Invalid config path `" +
                          os.path.abspath(configPath)+"`")
@@ -81,11 +82,11 @@ def YOLO():
             pass
     cap = cv2.VideoCapture(0)
     #cap = cv2.VideoCapture("test.mp4")
-    cap.set(4, 720)
-    cap.set(3, 1280)
-    out = cv2.VideoWriter(
-        "output.avi", cv2.VideoWriter_fourcc(*"MJPG"), 10.0,
-        (darknet.network_width(netMain), darknet.network_height(netMain)))
+    cap.set(3, 640)
+    cap.set(4, 360)
+    #out = cv2.VideoWriter(
+    #    "output.avi", cv2.VideoWriter_fourcc(*"MJPG"), 10.0,
+    #    (darknet.network_width(netMain), darknet.network_height(netMain)))
     print("Starting the YOLO loop...")
 
     # Create an image we reuse for each detect
