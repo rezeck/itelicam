@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import time
 import darknet
+import sys
 from ctypes import *
 import math
 from datetime import datetime
@@ -56,13 +57,15 @@ class Person:
 
 
 class YOLO_NN:
-    def __init__(self, yoloDataFolder):
+    def __init__(self, path='.', display=True):
 
-        self.configPath = yoloDataFolder + "/cfg/yolov3-tiny.cfg"
-        self.weightPath = yoloDataFolder + "/yolov3-tiny.weights"
-        #self.configPath = yoloDataFolder + "/yolov3/yolov3.cfg"
-        #self.weightPath = yoloDataFolder + "/yolov3/yolov3.weights"
-        self.metaPath = yoloDataFolder + "/cfg/coco.data"
+        self.display = display
+
+        self.configPath = path + "/cfg/yolov3-tiny.cfg"
+        self.weightPath = path + "/yolov3-tiny.weights"
+        #self.configPath = path + "/yolov3/yolov3.cfg"
+        #self.weightPath = path + "/yolov3/yolov3.weights"
+        self.metaPath = path + "/cfg/coco.data"
 
         print("self.configPath: " + self.configPath)
         print("self.weightPath: " + self.weightPath)
@@ -113,12 +116,19 @@ class YOLO_NN:
         self.darknet_image = darknet.make_image(darknet.network_width(self.netMain),
                                         darknet.network_height(self.netMain),3)
 
-        self.data_dir = os.path.expanduser(yoloDataFolder+'/face_data')
+        self.data_dir = os.path.expanduser(path+'/face_data')
         self.faces_folder_path = self.data_dir + '/users/'
 
         self.face_detector = dlib.get_frontal_face_detector()
         self.shape_predictor = dlib.shape_predictor(self.data_dir + '/dlib/shape_predictor_68_face_landmarks.dat')
         self.face_recognition_model = dlib.face_recognition_model_v1(self.data_dir + '/dlib/dlib_face_recognition_resnet_model_v1.dat')
+
+        self.face_encodings, self.person_names = self.load_face_encodings()
+        self.faceClassifier = cv2.CascadeClassifier(self.data_dir + '/dlib/haarcascade_frontalface_default.xml')
+        #rn.recognize_faces_in_video(face_encodings, person_names)
+
+        self.states = []
+        self.skip = -1
 
     def convertBack(self, x, y, w, h):
         xmin = int(round(x - (w / 2)))
@@ -209,7 +219,7 @@ class YOLO_NN:
             #dlib.hit_enter_to_continue()
         return face_encodings, person_names
 
-    def detect(self, frame_read):
+    def detect_yolo(self, frame_read):
         prev_time = time.time()
         frame_resized = cv2.resize(frame_read,
                                    (darknet.network_width(rn.netMain),
@@ -223,44 +233,7 @@ class YOLO_NN:
         
         return detections
 
-    # function to get the output layer names 
-    # in the architecture
-    def get_output_layers(self,net):
-        
-        layer_names = net.getLayerNames()
-        
-        output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-
-        return output_layers
-
-    # function to draw bounding box on the detected object with class name
-    def draw_bounding_box(self,img, class_id, confidence, x, y, x_plus_w, y_plus_h):
-
-
-        cv2.rectangle(img, (x,y), (x_plus_w,y_plus_h), (0, 0, 255), 2)
-
-        #cv2.putText(img, label, (x-10,y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
-
-if __name__ == "__main__":
-
-    # Start Yolo Setup
-    rn = YOLO_NN('.')
-
-    # initialize video input
-    cap = cv2.VideoCapture(1)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
-
-    face_encodings, person_names = rn.load_face_encodings()
-    faceClassifier = cv2.CascadeClassifier(rn.data_dir + '/dlib/haarcascade_frontalface_default.xml')
-    #rn.recognize_faces_in_video(face_encodings, person_names)
-
-    states = []
-    skip = -1
-    while True:
-        ret, frame_read = cap.read()
-        
+    def detect(self, frame_read):
         draw_frame = frame_read.copy()
         gray = cv2.cvtColor(frame_read, cv2.COLOR_BGR2GRAY)
         overlay = frame_read.copy()
@@ -273,10 +246,10 @@ if __name__ == "__main__":
 
         current_states = []
         gain = 0.8
-        skip += 1
-        if skip % 4 % 2 == 0:
+        self.skip += 1
+        if self.skip % 4 % 2 == 0:
             # Yolo Detection
-            detections = rn.detect(frame_read.copy())
+            detections = self.detect_yolo(frame_read.copy())
             filter_detections = []
 
             for detection in detections:
@@ -284,22 +257,20 @@ if __name__ == "__main__":
                     filter_detections.append(detection)
 
             if len(filter_detections) == 0: # Case Yolo didn't detected any person, try with dlib
-                face_rects = faceClassifier.detectMultiScale( # Detect faces with dlib
+                face_rects = self.faceClassifier.detectMultiScale( # Detect faces with dlib
                                     gray,
                                     scaleFactor = 1.1,
                                     minNeighbors = 5,
                                     minSize = (50, 50),
                                     flags = cv2.CASCADE_SCALE_IMAGE)
 
-                n_persons = len(face_rects)
-
                 if len(face_rects) > 0: # Case find any face
                     for (x, y, w, h) in face_rects:
                         face = draw_frame[y:y + h, x:x + w]
-                        face_encodings_in_image = rn.get_face_encodings(face)
+                        face_encodings_in_image = self.get_face_encodings(face)
 
                         if (face_encodings_in_image): 
-                            match = rn.find_match(face_encodings, person_names, face_encodings_in_image[0])
+                            match = self.find_match(self.face_encodings, self.person_names, face_encodings_in_image[0])
                             if match == "Not Found":
                                 #cv2.putText(draw_frame, "Unknow", (x+5, y-15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                                 #cv2.rectangle(draw_frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
@@ -320,10 +291,10 @@ if __name__ == "__main__":
                         detection[2][1],\
                         detection[2][2],\
                         detection[2][3]
-                    xmin, ymin, xmax, ymax = rn.convertBack(
+                    xmin, ymin, xmax, ymax = self.convertBack(
                         float(x1), float(y1), float(w1), float(h1))
-                    sx = 640.0/rn.darknet_width
-                    sy = 360.0/rn.darknet_height
+                    sx = 640.0/self.darknet_width
+                    sy = 360.0/self.darknet_height
                     xmin = int(xmin*sx)
                     ymin = int(ymin*sy)
                     xmax = int(xmax*sx)
@@ -332,22 +303,21 @@ if __name__ == "__main__":
                     pt2 = (xmax, ymax)
                     cropped = gray[ymin:ymax, xmin:xmax]
 
-                    face_rects = faceClassifier.detectMultiScale( # Detect faces with dlib
+                    face_rects = self.faceClassifier.detectMultiScale( # Detect faces with dlib
                                 gray,
                                 scaleFactor = 1.1,
                                 minNeighbors = 5,
                                 minSize = (50, 50),
                                 flags = cv2.CASCADE_SCALE_IMAGE)
-                    n_persons += 1 
 
                     if len(face_rects) > 0:
                         for (x, y, w, h) in face_rects:
                             face = gray[y:y + h, x:x + w]
-                            face_encodings_in_image = rn.get_face_encodings(face)
+                            face_encodings_in_image = self.get_face_encodings(face)
                             #x += xmin
                             #y += ymin
                             if (face_encodings_in_image):
-                                match = rn.find_match(face_encodings, person_names, face_encodings_in_image[0])
+                                match = self.find_match(self.face_encodings, self.person_names, face_encodings_in_image[0])
                                 if match == "Not Found":
                                     #cv2.putText(draw_frame, "Unknow", (x+5, y-15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                                     #cv2.rectangle(draw_frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
@@ -365,27 +335,25 @@ if __name__ == "__main__":
                         #cv2.rectangle(draw_frame, pt1, pt2, (255, 0, 0), 1)
                         #cv2.putText(draw_frame, "Unknow", (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                         current_states.append(Person("Unknow", time.time(), -1, int(xmin), int(ymin), int((xmax-xmin)), int((ymax-ymin)), 0.8)) # Using YOLO
-                        print("Using Yolo")
 
-
-        if not states:
-            print("Number of States: ", len(states))
-            states = current_states
+        if not self.states:
+            print("Number of States: ", len(self.states))
+            self.states = current_states
         else: # update
             old_states = []
             future_states = []
             visited_states = []
-            print("Number of States: ", len(states), len(current_states))
+            print("Number of States: ", len(self.states), len(current_states))
             n_users = 0
             n_persons = 0
-            for i in range(len(states)):
-                state = states[i]
+            for i in range(len(self.states)):
+                state = self.states[i]
                 state.t_to = time.time()
                 state.prob = max(0.0, state.prob - 0.05)
                 near_state = Person("Unknow", 0, 0, 0, 0, 0, 0, 0.0)
                 for current_state in current_states:
                     if current_state.name == state.name and state.name != "Unknow":
-                        print("Same name!")
+                        print("Same name case!")
                         near_state = current_state
                         near_state.prob = 1.0 # prior
                         break
@@ -409,13 +377,13 @@ if __name__ == "__main__":
                     if state.name == "Unknow":
                         state.name = near_state.name
 
-                states[i] = state
-                if states[i].prob == 0.0:
-                    old_states.append(states[i])
+                self.states[i] = state
+                if self.states[i].prob == 0.0:
+                    old_states.append(self.states[i])
                     continue
 
                 count = 0
-                for m_state in states:
+                for m_state in self.states:
                     if state.x == m_state.x and state.y == m_state.y:
                         count += 1
                     if count > 1:
@@ -440,7 +408,7 @@ if __name__ == "__main__":
             for current_state in current_states:
                 matches = 0
                 A = current_state.area()
-                for state in states:
+                for state in self.states:
                     B = current_state.area_intersection(state)
                     if B/A > 0.3:
                         matches += 1
@@ -449,7 +417,7 @@ if __name__ == "__main__":
 
             for state in old_states: # remove old states
                 try:
-                    states.remove(state)
+                    self.states.remove(state)
                 except:
                     pass
 
@@ -458,7 +426,7 @@ if __name__ == "__main__":
                 states.append(future_state)
 
             print("==============================")
-            for state in states:
+            for state in self.states:
                 state.show()
                 print("\n")
 
@@ -473,8 +441,52 @@ if __name__ == "__main__":
     
         # if the `q` key was pressed, break from the loop
         if key == ord("q"):
+            cv2.destroyAllWindows()
+            return False, self.states, draw_frame
+
+        return True, self.states, draw_frame
+
+    # function to get the output layer names 
+    # in the architecture
+    def get_output_layers(self,net):
+        
+        layer_names = net.getLayerNames()
+        
+        output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+
+        return output_layers
+
+    # function to draw bounding box on the detected object with class name
+    def draw_bounding_box(self,img, class_id, confidence, x, y, x_plus_w, y_plus_h):
+
+
+        cv2.rectangle(img, (x,y), (x_plus_w,y_plus_h), (0, 0, 255), 2)
+
+        #cv2.putText(img, label, (x-10,y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+
+if __name__ == "__main__":
+
+    # Start Yolo Setup
+    rn = YOLO_NN(path='.', display=True)
+
+    # initialize video input
+    if len(sys.argv) > 1:
+        cap = cv2.VideoCapture(int(sys.argv[1]))
+    else:
+        cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+
+    while True:
+        ret, frame_read = cap.read()
+        status, states, draw_frame = rn.detect(frame_read)
+
+        if not status:
             break
+        
+        
 
         
 
-    cv2.destroyAllWindows()
+    
