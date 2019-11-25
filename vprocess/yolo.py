@@ -424,7 +424,7 @@ class YOLO_NN:
 
             print("Future States: ", len(future_states))
             for future_state in future_states:
-                states.append(future_state)
+                self.states.append(future_state)
 
             print("==============================")
             for state in self.states:

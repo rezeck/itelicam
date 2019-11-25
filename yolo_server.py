@@ -5,6 +5,7 @@ from tornado.gen import coroutine
 from tornado.web import Application, RequestHandler
 from tornado.ioloop import IOLoop
 from queue import Queue
+import time
 
 # local imports
 from vprocess import DetectionVideoStream
@@ -12,13 +13,17 @@ from vprocess import DetectionVideoStream
 global QUEUE
 QUEUE = Queue(maxsize=5)
 
-detector = DetectionVideoStream()
+global detector
+detector = DetectionVideoStream(QUEUE)
 detector.start()
 
 class VideoStream(RequestHandler):
+    def post():
+        self.write({hello:"world"})
     @coroutine
-    def get(self):
-        global QUEUE
+
+    async def get(self):
+        global QUEUE, detector
         ioloop = tornado.ioloop.IOLoop.current()
 
         self.set_header('Cache-Control', 'no-store, no-cache, must-revalidate, pre-check=0, post-check=0, max-age=0')
@@ -30,19 +35,23 @@ class VideoStream(RequestHandler):
         self.served_image_timestamp = time.time()
         my_boundary = "--boundarydonotcross\n"
         while True:
+            print("VideoStream", QUEUE.qsize())
             img = QUEUE.get()
             interval = 1.0
-            if self.served_image_timestamp + interval < time.time():
+            print("\33[91mHAHAHAHAHAHAHHA\33[0m")
+            if True and self.served_image_timestamp + interval < time.time():
                 self.write(my_boundary)
                 self.write("Content-type: image/jpeg\r\n")
                 self.write("Content-length: %s\r\n\r\n" % len(img))
                 self.write(str(img))
                 self.served_image_timestamp = time.time()
-                yield tornado.gen.Task(self.flush)
+                #yield tornado.gen.Task(self.flush)
+                await self.flush()
             else:
-                yield tornado.gen.Task(ioloop.add_timeout, ioloop.time() + interval)
+                #yield tornado.gen.Task(ioloop.add_timeout, ioloop.time() + interval)
+                pass
             
-            QUEUE.task_done()
+            detector.QUEUE.task_done()
 
 def make_app():
     urls = [("/video", VideoStream)]

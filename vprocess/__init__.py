@@ -1,6 +1,7 @@
 from . import yolo
 from threading import Thread
 import cv2
+from queue import Queue
 
 DEFAULT_WIDTH = 640
 DEFAULT_HEIGHT = 360
@@ -41,9 +42,10 @@ class WebcamVideoStream:
         self.stopped = True
 
 class DetectionVideoStream(WebcamVideoStream):
-    def __init__(self):
+    def __init__(self, QUEUE):
         super().__init__()
         self.yolo_nn = yolo.YOLO_NN('vprocess')
+        self.QUEUE = QUEUE
     
     def update(self):
         global N_PERSONS,QUEUE
@@ -56,5 +58,6 @@ class DetectionVideoStream(WebcamVideoStream):
             # otherwise, read the next frame from the stream
             (self.grabbed, self.raw_frame) = self.stream.read()
             status, states, self.frame = self.yolo_nn.detect(self.raw_frame)
-
-            QUEUE.put(self.frame)
+            print("DetectionVideoStream", self.QUEUE.qsize())
+            if (self.QUEUE.qsize() < 5):
+                self.QUEUE.put(self.frame)
