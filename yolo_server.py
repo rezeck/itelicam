@@ -1,66 +1,42 @@
-# internal imports
-#!/usr/bin/env python3.5
-import tornado
-from tornado.gen import coroutine
-from tornado.web import Application, RequestHandler
-from tornado.ioloop import IOLoop
+# import core features
+from threading import Thread, Lock
 from queue import Queue
-import time
+from time import sleep
+from flask import Flask, render_template, Response, jsonify
+import cv2
 
-# local imports
+# import local modules
 from vprocess import DetectionVideoStream
 
-global QUEUE
-QUEUE = Queue(maxsize=5)
+app = Flask(__name__)
 
-global detector
-detector = DetectionVideoStream(QUEUE)
+detector = DetectionVideoStream()
 detector.start()
 
-class VideoStream(RequestHandler):
-    def post():
-        self.write({hello:"world"})
-    @coroutine
+def genVideo():
+    while True:
+        frame = detector.frame
+        (flag,encodedImage) = cv2.imencode(".jpg", frame)
 
-    async def get(self):
-        global QUEUE, detector
-        ioloop = tornado.ioloop.IOLoop.current()
+        if not flag:
+            continue
+        
+        yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + 
+            bytearray(encodedImage) + b'\r\n')
+         
 
-        self.set_header('Cache-Control', 'no-store, no-cache, must-revalidate, pre-check=0, post-check=0, max-age=0')
-        self.set_header('Connection', 'close')
-        self.set_header('Content-Type', 'multipart/x-mixed-replace;boundary=--boundarydonotcross')
-        self.set_header('Pragma', 'no-cache')
+@app.route('/')
+def root():
+    return jsonify({ "hello":"World" })
 
+@app.route("/video")
+def stream():
+	print("Starting MJPEG Stream")
+	return Response(genVideo(),
+		mimetype = "multipart/x-mixed-replace; boundary=frame")
 
-        self.served_image_timestamp = time.time()
-        my_boundary = "--boundarydonotcross\n"
-        while True:
-            print("VideoStream", QUEUE.qsize())
-            img = QUEUE.get()
-            interval = 1.0
-            print("\33[91mHAHAHAHAHAHAHHA\33[0m")
-            if True and self.served_image_timestamp + interval < time.time():
-                self.write(my_boundary)
-                self.write("Content-type: image/jpeg\r\n")
-                self.write("Content-length: %s\r\n\r\n" % len(img))
-                self.write(str(img))
-                self.served_image_timestamp = time.time()
-                #yield tornado.gen.Task(self.flush)
-                await self.flush()
-            else:
-                #yield tornado.gen.Task(ioloop.add_timeout, ioloop.time() + interval)
-                pass
-            
-            detector.QUEUE.task_done()
-
-def make_app():
-    urls = [("/video", VideoStream)]
-    return Application(urls)
-  
 if __name__ == '__main__':
-    app = make_app()
-    app.listen(3041)
-    try:
-        tornado.ioloop.IOLoop.instance().start()
-    except KeyboardInterrupt:
-        tornado.ioloop.IOLoop.instance().stop()
+    app.run(host="127.0.0.1", port="8000", debug=True,
+		threaded=True, use_reloader=False)
+
+detector.stop()

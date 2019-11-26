@@ -21,8 +21,9 @@ class WebcamVideoStream:
 
     def start(self):
         # start the thread to read frames from the video stream
+        self.queue = Queue(maxsize=5)
         Thread(target=self.update, args=()).start()
-        return self
+        return self.queue
     
     def update(self):
         # keep looping infinitely until the thread is stopped
@@ -42,10 +43,9 @@ class WebcamVideoStream:
         self.stopped = True
 
 class DetectionVideoStream(WebcamVideoStream):
-    def __init__(self, QUEUE):
+    def __init__(self):
         super().__init__()
         self.yolo_nn = yolo.YOLO_NN('vprocess')
-        self.QUEUE = QUEUE
     
     def update(self):
         global N_PERSONS,QUEUE
@@ -57,7 +57,4 @@ class DetectionVideoStream(WebcamVideoStream):
 
             # otherwise, read the next frame from the stream
             (self.grabbed, self.raw_frame) = self.stream.read()
-            status, states, self.frame = self.yolo_nn.detect(self.raw_frame)
-            print("DetectionVideoStream", self.QUEUE.qsize())
-            if (self.QUEUE.qsize() < 5):
-                self.QUEUE.put(self.frame)
+            success, self.persons, self.frame = self.yolo_nn.detect(self.raw_frame)
