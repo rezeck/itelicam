@@ -36,7 +36,7 @@ def stream():
 		mimetype = "multipart/x-mixed-replace; boundary=frame")
 
 if __name__ == '__main__':
-    app.run(host="127.0.0.1", port="8000", debug=True,
+    app.run(host="192.168.43.72", port="3041", debug=True,
 		threaded=True, use_reloader=False)
 
 detector.stop()
